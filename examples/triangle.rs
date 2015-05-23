@@ -34,27 +34,6 @@ gfx_vertex!( Vertex {
     a_Color@ color: [f32; 3],
 });
 
-struct ParamWrapper<T> {
-    params: Arc<T>,
-}
-
-impl<T> Clone for ParamWrapper<T> {
-    fn clone(&self) -> ParamWrapper<T> {
-        ParamWrapper { params: self.params.clone() }
-    }
-}
-
-impl<T: ShaderParam> ShaderParam for ParamWrapper<T> {
-    type Resources = T::Resources;
-    type Link = T::Link;
-    fn create_link(maybe_self: Option<&ParamWrapper<T>>, info: &ProgramInfo) -> Result<T::Link, ParameterError> {
-        ShaderParam::create_link(maybe_self.map(|x| &*x.params), info)
-    }
-    fn fill_params(&self, link: &T::Link, storage: &mut ParamStorage<T::Resources>) {
-        <T as ShaderParam>::fill_params(&self.params, link, storage)
-    }
-}
-
 gfx_parameters!(Params {});
 
 
@@ -110,8 +89,7 @@ fn main() {
             };
             factory.link_program_source(vs, fs).unwrap()
         };
-        let data = ParamWrapper { params: Arc::new(Params { _r: std::marker::PhantomData }) };
-        data.clone();
+        let data = Params { _r: std::marker::PhantomData };
         OwnedBatch::new(mesh, program, data).unwrap()
     };
 
