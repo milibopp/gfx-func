@@ -7,6 +7,7 @@ extern crate window;
 extern crate input;
 extern crate shader_version;
 extern crate glutin_window;
+extern crate gfxfunc;
 
 use std::rc::Rc;
 use std::cell::RefCell;
@@ -15,9 +16,9 @@ use window::{ WindowSettings };
 use shader_version::OpenGL;
 use glutin_window::GlutinWindow;
 use gfx::traits::{ FactoryExt, ToSlice };
-use gfx::{ Stream, Resources, ClearData, ParamStorage };
-use gfx::device::handle::Program;
-use gfx::batch::{ Batch, Context, BatchData };
+use gfx::{ Stream, Resources, ClearData };
+use gfx::batch::Context;
+use gfxfunc::{ Element };
 
 pub mod shared_win;
 
@@ -26,82 +27,6 @@ gfx_vertex!( Vertex {
     a_Pos@ pos: [f32; 2],
     a_Color@ color: [f32; 3],
 });
-
-
-pub trait DynamicBatch<R: Resources> {
-    fn get_data(&self) -> Result<BatchData<R>, String>;
-    fn fill_params(&self, values: &mut ParamStorage<R>) -> Result<&Program<R>, String>;
-}
-
-impl<B: Batch<R>, R: Resources> DynamicBatch<R> for B {
-    fn get_data(&self) -> Result<BatchData<R>, String> {
-        Batch::get_data(self)
-            .map_err(|err| format!("{:?}", err))
-    }
-
-    fn fill_params(&self, values: &mut ParamStorage<R>) -> Result<&Program<R>, String> {
-        Batch::fill_params(self, values)
-            .map_err(|err| format!("{:?}", err))
-    }
-}
-
-impl<'a, R: Resources> Batch<R> for Box<DynamicBatch<R> + 'a> {
-    type Error = String;
-    fn get_data(&self) -> Result<BatchData<R>, String> {
-        DynamicBatch::get_data(&**self)
-    }
-
-    fn fill_params(&self, values: &mut ParamStorage<R>) -> Result<&Program<R>, String> {
-        DynamicBatch::fill_params(&**self, values)
-    }
-}
-
-impl<'a, R: Resources> Batch<R> for &'a DynamicBatch<R> {
-    type Error = String;
-    fn get_data(&self) -> Result<BatchData<R>, String> {
-        DynamicBatch::get_data(&**self)
-    }
-
-    fn fill_params(&self, values: &mut ParamStorage<R>) -> Result<&Program<R>, String> {
-        DynamicBatch::fill_params(&**self, values)
-    }
-}
-
-
-pub enum Batches<'a, R> {
-    Single(&'a DynamicBatch<R>),
-    Empty,
-}
-
-impl<'a, R> Iterator for Batches<'a, R> {
-    type Item = &'a DynamicBatch<R>;
-
-    fn next(&mut self) -> Option<&'a DynamicBatch<R>> {
-        use std::mem;
-        use self::Batches::*;
-        let mut tmp = Empty;
-        mem::swap(self, &mut tmp);
-        let (ret, new) = match tmp {
-            Single(batch) => (Some(batch), Empty),
-            Empty => (None, Empty),
-        };
-        *self = new;
-        ret
-    }
-}
-
-
-pub trait Element<R: Resources> {
-    fn batches(&self) -> Batches<R>;
-}
-
-
-impl<B: Batch<R>, R: Resources> Element<R> for B {
-    fn batches(&self) -> Batches<R> {
-        Batches::Single(self)
-    }
-}
-
 
 fn run_from_source<R, W, E, F, S>(source: &mut SourceWindow<W>, stream: &mut S,
                                   mut render: F, element: E)
