@@ -7,7 +7,7 @@ extern crate window;
 extern crate input;
 extern crate shader_version;
 extern crate glutin_window;
-extern crate gfxfunc;
+extern crate gfx_func;
 
 use std::rc::Rc;
 use std::cell::RefCell;
@@ -18,7 +18,7 @@ use glutin_window::GlutinWindow;
 use gfx::traits::{ FactoryExt, ToSlice };
 use gfx::{ Stream, Resources, ClearData };
 use gfx::batch::Context;
-use gfxfunc::{ Element };
+use gfx_func::{ Element };
 
 pub mod shared_win;
 
