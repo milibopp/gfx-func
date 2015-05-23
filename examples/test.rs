@@ -10,11 +10,15 @@ extern crate glutin_window;
 
 use std::rc::Rc;
 use std::cell::RefCell;
-use carboxyl_window::SourceWindow;
+use carboxyl_window::{ SourceWindow, EventSource };
 use window::{ WindowSettings };
 use shader_version::OpenGL;
 use glutin_window::GlutinWindow;
 use gfx::traits::{ FactoryExt, ToSlice };
+use gfx::{ Stream, Resources, ClearData, ParamStorage };
+use gfx::device::handle::Program;
+use gfx::shade::ShaderParam;
+use gfx::batch::{ RefBatch, RefBatchFull, Batch, Context, OutOfBounds, BatchData };
 
 pub mod shared_win;
 
@@ -25,8 +29,79 @@ gfx_vertex!( Vertex {
 });
 
 
+pub trait RefBatchPoly<R: Resources> {
+    fn get_data(&self) -> Result<BatchData<R>, OutOfBounds>;
+    fn fill_params(&self, values: &mut ParamStorage<R>) -> Result<&Program<R>, OutOfBounds>;
+}
+
+impl<'a, T: ShaderParam + 'a> RefBatchPoly<T::Resources> for RefBatchFull<'a, T> {
+    fn get_data(&self) -> Result<BatchData<T::Resources>, OutOfBounds> {
+        Batch::get_data(self)
+    }
+    fn fill_params(&self, values: &mut ParamStorage<T::Resources>) -> Result<&Program<T::Resources>, OutOfBounds> {
+        Batch::fill_params(self, values)
+    }
+}
+
+impl<'a, R: Resources> Batch<R> for Box<RefBatchPoly<R> + 'a> {
+    type Error = OutOfBounds;
+    fn get_data(&self) -> Result<BatchData<R>, OutOfBounds> {
+        RefBatchPoly::get_data(&**self)
+    }
+    fn fill_params(&self, values: &mut ParamStorage<R>) -> Result<&Program<R>, OutOfBounds> {
+        RefBatchPoly::fill_params(&**self, values)
+    }
+}
+
+impl<'a, R: Resources> Batch<R> for &'a RefBatchPoly<R> {
+    type Error = OutOfBounds;
+    fn get_data(&self) -> Result<BatchData<R>, OutOfBounds> {
+        RefBatchPoly::get_data(&**self)
+    }
+    fn fill_params(&self, values: &mut ParamStorage<R>) -> Result<&Program<R>, OutOfBounds> {
+        RefBatchPoly::fill_params(&**self, values)
+    }
+}
+
+
+pub trait Element<R: Resources> {
+    fn batches<'a>(&'a self, context: &'a Context<R>) -> Box<Iterator<Item=Box<RefBatchPoly<R> + 'a>> + 'a>;
+}
+
+
+impl<T: ShaderParam> Element<T::Resources> for RefBatch<T> {
+    fn batches<'a>(&'a self, context: &'a Context<T::Resources>) -> Box<Iterator<Item=Box<RefBatchPoly<T::Resources> + 'a>> + 'a> {
+        let b: Box<RefBatchPoly<T::Resources> + 'a> = Box::new((self, context));
+        Box::new(Some(b).into_iter())
+    }
+}
+
+
+fn run_from_source<R, W, E, F, S>(source: &mut SourceWindow<W>, stream: &mut S,
+                                  mut render: F, context: &Context<R>,
+                                  element: E)
+    where R: Resources,
+          W: EventSource,
+          E: Element<R>,
+          S: Stream<R>,
+          F: FnMut(&mut S),
+{
+    use gfx::extra::stream::Stream;
+    source.run(|| {
+        stream.clear(gfx::ClearData {
+            color: [0.3, 0.3, 0.3, 1.0],
+            depth: 1.0,
+            stencil: 0,
+        });
+        for batch in element.batches(context) {
+            stream.draw(&batch).unwrap();
+        }
+        render(stream)
+    })
+}
+
+
 fn main() {
-    use gfx::batch::Context;
 
     const GLVERSION: OpenGL = OpenGL::_2_1;
     let settings = WindowSettings::new("gfx + carboxyl_window", (640, 480));
@@ -62,14 +137,10 @@ fn main() {
     };
 
 
-    source.run(|| {
-        use gfx::extra::stream::Stream;
-        stream.clear(gfx::ClearData {
-            color: [0.3, 0.3, 0.3, 1.0],
-            depth: 1.0,
-            stencil: 0,
-        });
-        stream.draw(&(&batch, &context)).unwrap();
-        stream.present(&mut device);
-    });
+    run_from_source(
+        &mut source, &mut stream,
+        |s| s.present(&mut device),
+        &mut context,
+        batch,
+    );
 }
