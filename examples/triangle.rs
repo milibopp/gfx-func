@@ -1,4 +1,4 @@
-#[macro_use(gfx_vertex)]
+#[macro_use(gfx_vertex, gfx_parameters)]
 extern crate gfx;
 extern crate gfx_device_gl;
 extern crate glutin;
@@ -15,13 +15,16 @@ use std::cell::RefCell;
 use std::sync::Arc;
 use carboxyl::Signal;
 use carboxyl_window::{ SourceWindow, EventSource };
-use window::{ WindowSettings };
+use window::WindowSettings;
 use shader_version::OpenGL;
 use glutin_window::GlutinWindow;
 use gfx::traits::FactoryExt;
 use gfx::{ Stream, Resources, ClearData };
-use gfx::batch::OwnedBatch;
-use gfx_func::{ Element };
+use gfx::batch::{ Batch, OwnedBatch };
+use gfx::shade::{ ShaderParam, ParameterError };
+use gfx::device::shade::ProgramInfo;
+use gfx::render::ParamStorage;
+use gfx_func::Element;
 
 pub mod shared_win;
 
@@ -31,11 +34,35 @@ gfx_vertex!( Vertex {
     a_Color@ color: [f32; 3],
 });
 
+struct ParamWrapper<T> {
+    params: Arc<T>,
+}
+
+impl<T> Clone for ParamWrapper<T> {
+    fn clone(&self) -> ParamWrapper<T> {
+        ParamWrapper { params: self.params.clone() }
+    }
+}
+
+impl<T: ShaderParam> ShaderParam for ParamWrapper<T> {
+    type Resources = T::Resources;
+    type Link = T::Link;
+    fn create_link(maybe_self: Option<&ParamWrapper<T>>, info: &ProgramInfo) -> Result<T::Link, ParameterError> {
+        ShaderParam::create_link(maybe_self.map(|x| &*x.params), info)
+    }
+    fn fill_params(&self, link: &T::Link, storage: &mut ParamStorage<T::Resources>) {
+        <T as ShaderParam>::fill_params(&self.params, link, storage)
+    }
+}
+
+gfx_parameters!(Params {});
+
+
 fn run_from_source<R, W, E, F, S>(source: &mut SourceWindow<W>, stream: &mut S,
-                                  mut render: F, element: Signal<Arc<E>>)
+                                  mut render: F, element: Signal<E>)
     where R: Resources,
           W: EventSource,
-          E: Element<R> + 'static,
+          E: Element<R> + Clone + Send + Sync + 'static,
           S: Stream<R>,
           F: FnMut(&mut S),
 {
@@ -48,7 +75,8 @@ fn run_from_source<R, W, E, F, S>(source: &mut SourceWindow<W>, stream: &mut S,
         });
         let current = element.sample();
         for batch in current.batches() {
-            stream.draw(&batch).unwrap();
+            let _: &Batch<R> = batch;
+            stream.draw(batch).unwrap();
         }
         render(stream)
     })
@@ -62,7 +90,7 @@ fn main() {
     let (mut stream, mut device, mut factory) = shared_win::init_shared(window.clone());
     let mut source = SourceWindow::new(window.clone(), 10_000_000);
 
-    let batch = Arc::new({
+    let batch = {
         let vertex_data = [
             Vertex { pos: [ -0.5, -0.5 ], color: [1.0, 0.0, 0.0] },
             Vertex { pos: [  0.5, -0.5 ], color: [0.0, 1.0, 0.0] },
@@ -82,8 +110,10 @@ fn main() {
             };
             factory.link_program_source(vs, fs).unwrap()
         };
-        OwnedBatch::new(mesh, program, None).unwrap()
-    });
+        let data = ParamWrapper { params: Arc::new(Params { _r: std::marker::PhantomData }) };
+        data.clone();
+        OwnedBatch::new(mesh, program, data).unwrap()
+    };
 
     run_from_source(
         &mut source, &mut stream,
