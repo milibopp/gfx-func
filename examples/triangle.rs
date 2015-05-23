@@ -52,7 +52,6 @@ fn run_from_source<R, W, E, F, S>(source: &mut SourceWindow<W>, stream: &mut S,
 
 
 fn main() {
-
     const GLVERSION: OpenGL = OpenGL::_2_1;
     let settings = WindowSettings::new("gfx + carboxyl_window", (640, 480));
     let window = Rc::new(RefCell::new(GlutinWindow::new(GLVERSION, settings)));
@@ -85,7 +84,6 @@ fn main() {
         let state = gfx::DrawState::new();
         context.make_batch(&program, None, &mesh, slice, &state).ok().unwrap()
     };
-
 
     run_from_source(
         &mut source, &mut stream,
