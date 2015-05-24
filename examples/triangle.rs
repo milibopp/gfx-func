@@ -17,10 +17,9 @@ use window::WindowSettings;
 use shader_version::OpenGL;
 use glutin_window::GlutinWindow;
 use gfx::traits::FactoryExt;
-use gfx::{ Stream, Resources, ClearData };
+use gfx::{ Stream, ClearData };
 use gfx::batch::OwnedBatch;
-use gfx_func::Element;
-use gfx_func::element::{ Batch, Cleared };
+use gfx_func::element::{ Draw, Batch, Cleared };
 
 pub mod shared_win;
 
@@ -29,22 +28,6 @@ gfx_vertex!( Vertex {
     a_Pos@ pos: [f32; 2],
     a_Color@ color: [f32; 3],
 });
-
-
-pub fn draw_element<R, E, F, S>(stream: &mut S, mut render: F, element: &Signal<E>)
-    where R: Resources, S: Stream<R>, F: FnMut(&mut S),
-          E: Element<R> + Clone + Send + Sync + 'static,
-{
-    let current = element.sample();
-    for cmd in current.commands() {
-        use gfx_func::command::Command::*;
-        match cmd {
-            Clear(data) => stream.clear(data),
-            Draw(batch) => stream.draw(batch).unwrap(),
-        }
-    }
-    render(stream);
-}
 
 
 fn main() {
@@ -82,6 +65,8 @@ fn main() {
     ));
 
     source.run_with(120.0, || {
-        draw_element(&mut stream, |s| s.present(&mut device), &signal);
+        let element = signal.sample();
+        element.draw(&mut stream);
+        stream.present(&mut device);
     });
 }
