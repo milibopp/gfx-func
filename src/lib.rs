@@ -2,6 +2,7 @@
 
 extern crate gfx;
 
-pub use element::{ Element, Batches };
+pub use element::Element;
 
-mod element;
+pub mod element;
+pub mod command;
