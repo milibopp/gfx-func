@@ -12,8 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-use std::rc::Rc;
-use std::cell::RefCell;
+use std::sync::{ Arc, RwLock };
 use gfx;
 use gfx::tex::Size;
 use gfx_device_gl;
@@ -23,7 +22,7 @@ use window::{ self, OpenGLWindow };
 /// A wrapper around the window that implements `Output`.
 pub struct Output<R: gfx::Resources, W: OpenGLWindow> {
     /// Glutin window in the open.
-    pub window: Rc<RefCell<W>>,
+    pub window: Arc<RwLock<W>>,
     frame: gfx::handle::FrameBuffer<R>,
     mask: gfx::Mask,
     supports_gamma_convertion: bool,
@@ -48,7 +47,7 @@ impl<R: gfx::Resources, W: OpenGLWindow> gfx::Output<R> for Output<R, W> {
     }
 
     fn get_size(&self) -> (Size, Size) {
-        let window::Size { width, height } = self.window.borrow().size();
+        let window::Size { width, height } = self.window.read().unwrap().size();
         (width as Size, height as Size)
     }
 
@@ -63,7 +62,7 @@ impl<R: gfx::Resources, W: OpenGLWindow> gfx::Output<R> for Output<R, W> {
 
 impl<R: gfx::Resources, W: OpenGLWindow> gfx::Window<R> for Output<R, W> {
     fn swap_buffers(&mut self) {
-        self.window.borrow_mut().swap_buffers();
+        self.window.write().unwrap().swap_buffers();
     }
 }
 
@@ -79,10 +78,10 @@ pub type Success<W> = (
 );
 
 /// Initialize with a window.
-pub fn init_shared<W: OpenGLWindow>(window: Rc<RefCell<W>>) -> Success<W> {
+pub fn init_shared<W: OpenGLWindow>(window: Arc<RwLock<W>>) -> Success<W> {
     use gfx::traits::StreamFactory;
     
-    let mut window_lock = window.borrow_mut();
+    let mut window_lock = window.write().unwrap();
     window_lock.make_current();
     let device = gfx_device_gl::Device::new(|s| window_lock.get_proc_address(s));
     let mut factory = device.spawn_factory();

@@ -10,21 +10,17 @@ extern crate shader_version;
 extern crate glutin_window;
 extern crate gfx_func;
 
-use std::rc::Rc;
-use std::cell::RefCell;
-use std::sync::Arc;
+use std::sync::{ Arc, RwLock };
 use carboxyl::Signal;
-use carboxyl_window::{ SourceWindow, EventSource };
+use carboxyl_window::{ SourceWindow, RunnableWindow };
 use window::WindowSettings;
 use shader_version::OpenGL;
 use glutin_window::GlutinWindow;
 use gfx::traits::FactoryExt;
 use gfx::{ Stream, Resources, ClearData };
-use gfx::batch::{ Batch, OwnedBatch };
-use gfx::shade::{ ShaderParam, ParameterError };
-use gfx::device::shade::ProgramInfo;
-use gfx::render::ParamStorage;
+use gfx::batch::OwnedBatch;
 use gfx_func::Element;
+use gfx_func::element::{ Batch, Cleared };
 
 pub mod shared_win;
 
@@ -34,40 +30,29 @@ gfx_vertex!( Vertex {
     a_Color@ color: [f32; 3],
 });
 
-gfx_parameters!(Params {});
 
-
-fn run_from_source<R, W, E, F, S>(source: &mut SourceWindow<W>, stream: &mut S,
-                                  mut render: F, element: Signal<E>)
-    where R: Resources,
-          W: EventSource,
+pub fn draw_element<R, E, F, S>(stream: &mut S, mut render: F, element: &Signal<E>)
+    where R: Resources, S: Stream<R>, F: FnMut(&mut S),
           E: Element<R> + Clone + Send + Sync + 'static,
-          S: Stream<R>,
-          F: FnMut(&mut S),
 {
-    use gfx::extra::stream::Stream;
-    source.run(|| {
-        stream.clear(gfx::ClearData {
-            color: [0.3, 0.3, 0.3, 1.0],
-            depth: 1.0,
-            stencil: 0,
-        });
-        let current = element.sample();
-        for batch in current.batches() {
-            let _: &Batch<R> = batch;
-            stream.draw(batch).unwrap();
+    let current = element.sample();
+    for cmd in current.commands() {
+        use gfx_func::command::Command::*;
+        match cmd {
+            Clear(data) => stream.clear(data),
+            Draw(batch) => stream.draw(batch).unwrap(),
         }
-        render(stream)
-    })
+    }
+    render(stream);
 }
 
 
 fn main() {
     const GLVERSION: OpenGL = OpenGL::_2_1;
     let settings = WindowSettings::new("gfx + carboxyl_window", (640, 480));
-    let window = Rc::new(RefCell::new(GlutinWindow::new(GLVERSION, settings)));
+    let window = Arc::new(RwLock::new(GlutinWindow::new(GLVERSION, settings)));
     let (mut stream, mut device, mut factory) = shared_win::init_shared(window.clone());
-    let mut source = SourceWindow::new(window.clone(), 10_000_000);
+    let mut source = SourceWindow::new(window.clone());
 
     let batch = {
         let vertex_data = [
@@ -89,13 +74,14 @@ fn main() {
             };
             factory.link_program_source(vs, fs).unwrap()
         };
-        let data = Params { _r: std::marker::PhantomData };
-        OwnedBatch::new(mesh, program, data).unwrap()
+        OwnedBatch::new(mesh, program, None).unwrap()
     };
+    let signal = Signal::new(Cleared::new(
+        ClearData { color: [0.3, 0.3, 0.3, 1.0], depth: 1.0, stencil: 0 },
+        Batch(batch)
+    ));
 
-    run_from_source(
-        &mut source, &mut stream,
-        |s| s.present(&mut device),
-        Signal::new(batch)
-    );
+    source.run_with(120.0, || {
+        draw_element(&mut stream, |s| s.present(&mut device), &signal);
+    });
 }
