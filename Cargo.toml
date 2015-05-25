@@ -4,15 +4,18 @@ version = "0.0.1"
 authors = ["Eduard Bopp <eduard.bopp@aepsil0n.de>"]
 
 [dependencies]
-gfx = "*"
+gfx = "0.5"
+num = "0.1"
+carboxyl = "0.1"
+nalgebra = "0.2"
+
+[dependencies.carboxyl_window]
+git = "https://github.com/aepsil0n/carboxyl_window"
 
 [dev-dependencies]
 gfx_device_gl = "*"
 glutin = "*"
-carboxyl = "0.0.11"
-
-[dev-dependencies.carboxyl_window]
-git = "https://github.com/aepsil0n/carboxyl_window"
+time = "0.1"
 
 [dev-dependencies.pistoncore-window]
 git = "https://github.com/PistonDevelopers/window"
@@ -25,3 +28,6 @@ git = "https://github.com/PistonDevelopers/shader_version"
 
 [dev-dependencies.pistoncore-glutin_window]
 git = "https://github.com/PistonDevelopers/glutin_window"
+
+[dev-dependencies.carboxyl_time]
+git = "https://github.com/aepsil0n/carboxyl_time"
