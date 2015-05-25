@@ -4,13 +4,15 @@ version = "0.0.1"
 authors = ["Eduard Bopp <eduard.bopp@aepsil0n.de>"]
 
 [dependencies]
-gfx = "0.5"
 num = "0.1"
 carboxyl = "0.1"
 nalgebra = "0.2"
 
 [dependencies.carboxyl_window]
 git = "https://github.com/aepsil0n/carboxyl_window"
+
+[dependencies.gfx]
+git = "https://github.com/gfx-rs/gfx-rs"
 
 [dev-dependencies]
 gfx_device_gl = "*"
