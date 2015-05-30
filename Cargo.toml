@@ -23,3 +23,6 @@ pistoncore-glutin_window = "*"
 
 [dev-dependencies.carboxyl_time]
 git = "https://github.com/aepsil0n/carboxyl_time"
+
+[dev-dependencies.gfx_window_shared]
+git = "https://github.com/aepsil0n/gfx_window_shared"

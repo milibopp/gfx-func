@@ -9,6 +9,7 @@ extern crate input;
 extern crate shader_version;
 extern crate glutin_window;
 extern crate gfx_func;
+extern crate gfx_window_shared;
 
 use std::sync::{ Arc, RwLock };
 use carboxyl::Signal;
@@ -17,11 +18,8 @@ use window::WindowSettings;
 use shader_version::OpenGL;
 use glutin_window::GlutinWindow;
 use gfx::traits::FactoryExt;
-use gfx::{ Stream, ClearData };
-use gfx::batch::OwnedBatch;
+use gfx::{ batch, Stream, ClearData };
 use gfx_func::element::{ Draw, Batch, Cleared };
-
-pub mod shared_win;
 
 
 gfx_vertex!( Vertex {
@@ -34,7 +32,7 @@ fn main() {
     const GLVERSION: OpenGL = OpenGL::_2_1;
     let settings = WindowSettings::new("gfx + carboxyl_window", (640, 480));
     let window = Arc::new(RwLock::new(GlutinWindow::new(GLVERSION, settings)));
-    let (mut stream, mut device, mut factory) = shared_win::init_shared(window.clone());
+    let (mut stream, mut device, mut factory) = gfx_window_shared::init_sync(window.clone());
     let mut source = SourceWindow::new(window.clone());
 
     let batch = {
@@ -57,7 +55,7 @@ fn main() {
             };
             factory.link_program_source(vs, fs).unwrap()
         };
-        OwnedBatch::new(mesh, program, None).unwrap()
+        batch::Full::new(mesh, program, None).unwrap()
     };
     let signal = Signal::new(Cleared::new(
         ClearData { color: [0.3, 0.3, 0.3, 1.0], depth: 1.0, stencil: 0 },
